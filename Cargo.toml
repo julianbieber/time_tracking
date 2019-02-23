@@ -1,0 +1,9 @@
+[package]
+name = "track"
+version = "0.1.0"
+authors = ["Julian Bieber <j.bieber@patagona.de>"]
+edition = "2018"
+
+[dependencies]
+clap = "2"
+dirs = "1"
