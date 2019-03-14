@@ -7,7 +7,7 @@ use clap::{App, SubCommand, Arg};
 use std::path::Path;
 use std::io::prelude::*;
 use std::io::{BufReader, BufRead};
-use std::fs::{OpenOptions, create_dir_all};
+use std::fs::{OpenOptions, create_dir_all, read_dir};
 use std::error::Error;
 use std::time::{SystemTime, Duration};
 
@@ -44,7 +44,25 @@ fn task_time(task_name: &str) -> Result<(), Box<dyn Error>> {
             previous_time = Some(line?.as_str().parse::<u64>()?);
         }
     }
-    println!("{:?}", duration);
+    println!("{:?}h", duration.as_secs() / 3600);
+    Ok(())
+}
+
+fn break_tasks() -> Result<(), Box<dyn Error>> {
+    let tasks_path = config::base_path();
+
+    for task_entry in read_dir(tasks_path)? {
+        let task_path = task_entry?.path();
+        if task_path.is_file() {
+            let file= BufReader::new(
+                OpenOptions::new().read(true).open(&task_path)?
+            );
+
+            if file.lines().count() % 2 != 0 {
+                track_task(task_path.file_name().and_then(|f| f.to_str()).expect(""))?;
+            }
+        }
+    }
     Ok(())
 }
 
@@ -59,9 +77,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         Arg::with_name("").takes_value(true).required(true)
     );
 
+    let break_command_name = "break";
+    let break_command = SubCommand::with_name(break_command_name);
+
     let matches = App::new("track")
         .subcommand(time_sub_command)
         .subcommand(task_time_command)
+        .subcommand(break_command)
         .get_matches();
 
     if let Some(command) = matches.subcommand_matches(time_command_name) {
@@ -74,6 +96,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         task_time(task)?;
     }
 
+    if let Some(_command) = matches.subcommand_matches(break_command_name) {
+        break_tasks()?;
+    }
 
     Ok(())
 }
