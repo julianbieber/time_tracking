@@ -66,6 +66,38 @@ fn break_tasks() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn continue_tasks() -> Result<(), Box<dyn Error>> {
+    let tasks_path = config::base_path();
+
+    let mut most_recent: Option<(String, u64)> = None;
+
+    for task_entry in read_dir(tasks_path)? {
+        let task_path = task_entry?.path();
+        if task_path.is_file() {
+            let file = BufReader::new(
+                OpenOptions::new().read(true).open(&task_path)?
+            );
+
+            let lines: Vec<String> = file.lines().into_iter().map(|l| l.expect("")).collect();
+
+            if lines.len() % 2 == 0 && lines.len() > 0 {
+                let last_timestamp = lines.last().expect("").parse::<u64>()?;
+                let (_, current_most_recent_timestamp) = most_recent.clone().unwrap_or((String::new(), 0u64));
+
+                if last_timestamp > current_most_recent_timestamp {
+                    most_recent = Some((task_path.file_name().and_then(|f| f.to_str()).expect("").to_string(), last_timestamp))
+                }
+            }
+        }
+    }
+
+    most_recent.and_then(|(most_recent_task, _)| {
+       track_task(most_recent_task.as_str()).err()
+    });
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let time_command_name = "time";
     let time_sub_command = SubCommand::with_name(time_command_name).arg(
@@ -80,10 +112,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let break_command_name = "break";
     let break_command = SubCommand::with_name(break_command_name);
 
+    let continue_command_name = "continue";
+    let continue_command = SubCommand::with_name(continue_command_name);
+
     let matches = App::new("track")
         .subcommand(time_sub_command)
         .subcommand(task_time_command)
         .subcommand(break_command)
+        .subcommand(continue_command)
         .get_matches();
 
     if let Some(command) = matches.subcommand_matches(time_command_name) {
@@ -98,6 +134,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if let Some(_command) = matches.subcommand_matches(break_command_name) {
         break_tasks()?;
+    }
+
+    if let Some(_command) = matches.subcommand_matches(continue_command_name) {
+        continue_tasks()?;
     }
 
     Ok(())
